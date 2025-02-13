@@ -68,6 +68,22 @@ siniestralidad_data <- data.frame(
   Count = sample(30:80, 3)
 )
 
+# Dashboard 4: Cumplimiento Normativo y Reporte Regulatorio
+compliance_data <- data.frame(
+  Date = seq.Date(from = as.Date("2024-01-01"), to = as.Date("2024-12-01"), by = "month"),
+  ComplianceScore = round(runif(12, 70, 100), 0)
+)
+compliance_time <- data.frame(
+  Month = format(compliance_data$Date, "%b %Y"),
+  Cumple = round(runif(12, 70, 120), 0),
+  NoCumple = round(runif(12, 10, 30), 0),
+  Pendiente = round(runif(12, 20, 40), 0)
+)
+# Para el Bullet Chart: uso del dato más reciente
+actual_compliance <- tail(compliance_data$ComplianceScore, 1)
+target_compliance <- 90
+
+
 # Interfaz de usuario con menú para cada dashboard
 ui <- dashboardPage(
   dashboardHeader(title = "ECUARE Dashboards"),
@@ -75,7 +91,8 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("Portafolio y Rentabilidad", tabName = "portafolio", icon = icon("chart-line")),
       menuItem("Riesgos y Eventos Naturales", tabName = "riesgos", icon = icon("exclamation-circle")),
-      menuItem("Reclamaciones y Siniestralidad", tabName = "reclamaciones", icon = icon("exclamation-triangle"))
+      menuItem("Reclamaciones y Siniestralidad", tabName = "reclamaciones", icon = icon("exclamation-triangle")),
+      menuItem("Cumplimiento Normativo", tabName = "cumplimiento", icon = icon("gavel"))
     )
   ),
   dashboardBody(
@@ -135,6 +152,19 @@ ui <- dashboardPage(
                 ),
                 box(title = "Categorías de Siniestralidad", status = "warning", solidHeader = TRUE, width = 6,
                     highchartOutput("columnChart", height = "300px")
+                )
+              )
+      ),
+      # Dashboard 4: Cumplimiento Normativo
+      tabItem(tabName = "cumplimiento",
+              fluidRow(
+                box(title = "Estado de Cumplimiento Mensual (Apilado)", status = "success", solidHeader = TRUE, width = 12,
+                    highchartOutput("stackedCompliance", height = "300px")
+                )
+              ),
+              fluidRow(
+                box(title = "Cumplimiento Actual vs Objetivo", status = "success", solidHeader = TRUE, width = 12,
+                    highchartOutput("complianceBullet", height = "200px")
                 )
               )
       )
@@ -290,6 +320,35 @@ server <- function(input, output, session) {
           click = JS("function() { chartClicked(); }")
         )
       ))
+  })
+  
+  ## Dashboard 4: Cumplimiento Normativo
+  
+  output$stackedCompliance <- renderHighchart({
+    highchart() %>%
+      hc_chart(type = "column") %>%
+      hc_title(text = "Estado de Cumplimiento Mensual") %>%
+      hc_xAxis(categories = compliance_time$Month) %>%
+      hc_yAxis(min = 0, title = list(text = "Número de Casos")) %>%
+      hc_plotOptions(column = list(stacking = "normal")) %>%
+      hc_add_series(name = "Cumple", data = compliance_time$Cumple) %>%
+      hc_add_series(name = "No Cumple", data = compliance_time$NoCumple) %>%
+      hc_add_series(name = "Pendiente", data = compliance_time$Pendiente) %>%
+      hc_tooltip(shared = TRUE)
+  })
+  
+  output$complianceBullet <- renderHighchart({
+    highchart() %>%
+      hc_chart(type = "bullet") %>%
+      hc_add_dependency("modules/bullet.js") %>%  # Agrega el módulo de bullet
+      hc_title(text = "Cumplimiento Actual vs Objetivo") %>%
+      hc_yAxis(min = 0, max = 120, title = list(text = "Índice de Cumplimiento")) %>%
+      hc_add_series(
+        list(
+          data = list(list(y = actual_compliance, target = target_compliance))
+        )
+      ) %>%
+      hc_tooltip(pointFormat = "Actual: <b>{point.y}</b><br>Objetivo: <b>{point.target}</b>")
   })
   
 }
